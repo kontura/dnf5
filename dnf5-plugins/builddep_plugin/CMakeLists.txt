@@ -7,6 +7,6 @@ add_library(builddep_cmd_plugin MODULE builddep.cpp builddep_cmd_plugin.cpp)
 set_target_properties(builddep_cmd_plugin PROPERTIES PREFIX "")
 
 find_library(RPMBUILD NAMES rpmbuild REQUIRED)
-target_link_libraries(builddep_cmd_plugin ${RPMBUILD})
+#target_link_libraries(builddep_cmd_plugin ${RPMBUILD})
 
 install(TARGETS builddep_cmd_plugin LIBRARY DESTINATION ${CMAKE_INSTALL_FULL_LIBDIR}/dnf5/plugins/)

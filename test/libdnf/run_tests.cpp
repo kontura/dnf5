@@ -35,6 +35,11 @@ along with libdnf.  If not, see <https://www.gnu.org/licenses/>.
 #include <iostream>
 #include <memory>
 
+#if defined(__clang__) || defined (__GNUC__)
+# define ATTRIBUTE_NO_SANITIZE_ADDRESS __attribute__((no_sanitize_address))
+#else
+# define ATTRIBUTE_NO_SANITIZE_ADDRESS
+#endif
 
 // HACK: CppUnit doesn't give access to the actual test case it is running. The
 // given pointer is an instance of CppUnit::TestCaller, which has the test case
@@ -42,6 +47,7 @@ along with libdnf.  If not, see <https://www.gnu.org/licenses/>.
 //
 // Here we mimic the structure of CppUnit::TestCaller and make the pointer
 // accessible.
+
 class HackTestCaller : CppUnit::TestCase {
 public:
     bool m_ownFixture;              // unused
@@ -63,30 +69,32 @@ private:
     std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::from_time_t(0);
 };
 
-class LogCaptureListener : public CppUnit::TestListener {
-public:
-    void startTest(CppUnit::Test * t) override {
-        auto * f = reinterpret_cast<HackTestCaller *>(t);
-        auto * tc = dynamic_cast<BaseTestCase *>(f->m_fixture);
-
-        if (tc) {
-            tc->base.get_logger()->add_logger(std::make_unique<libdnf::MemoryBufferLogger>(10000, 256));
-        }
-    }
-
-    void addFailure(const CppUnit::TestFailure & failure) override {
-        auto * f = reinterpret_cast<HackTestCaller *>(failure.failedTest());
-        auto * tc = dynamic_cast<BaseTestCase *>(f->m_fixture);
-
-        if (tc) {
-            std::cout << std::endl << "Dnf log:" << std::endl;
-            libdnf::StdCStreamLogger cout_logger(std::cout);
-            dynamic_cast<libdnf::MemoryBufferLogger *>(tc->base.get_logger()->get_logger(0))
-                ->write_to_logger(cout_logger);
-            std::cout << std::endl << std::flush;
-        }
-    }
-};
+//class LogCaptureListener : public CppUnit::TestListener {
+//public:
+//    ATTRIBUTE_NO_SANITIZE_ADDRESS
+//    void startTest(CppUnit::Test * t) override {
+//        auto * f = reinterpret_cast<HackTestCaller *>(t);
+//        auto * tc = dynamic_cast<BaseTestCase *>(f->m_fixture);
+//
+//        if (tc) {
+//            tc->base.get_logger()->add_logger(std::make_unique<libdnf::MemoryBufferLogger>(10000, 256));
+//        }
+//    }
+//
+//    ATTRIBUTE_NO_SANITIZE_ADDRESS
+//    void addFailure(const CppUnit::TestFailure & failure) override {
+//        auto * f = reinterpret_cast<HackTestCaller *>(failure.failedTest());
+//        auto * tc = dynamic_cast<BaseTestCase *>(f->m_fixture);
+//
+//        if (tc) {
+//            std::cout << std::endl << "Dnf log:" << std::endl;
+//            libdnf::StdCStreamLogger cout_logger(std::cout);
+//            dynamic_cast<libdnf::MemoryBufferLogger *>(tc->base.get_logger()->get_logger(0))
+//                ->write_to_logger(cout_logger);
+//            std::cout << std::endl << std::flush;
+//        }
+//    }
+//};
 
 
 int main(int argc, char * argv[]) {
@@ -103,8 +111,8 @@ int main(int argc, char * argv[]) {
     TimingListener timer;
     controller.addListener(&timer);
 
-    LogCaptureListener log_capture;
-    controller.addListener(&log_capture);
+   // LogCaptureListener log_capture;
+   // controller.addListener(&log_capture);
 
     // Add a listener that print dots as test run.
     CPPUNIT_NS::BriefTestProgressListener progress;
