@@ -49,6 +49,7 @@ struct PackageReplay {
     TransactionItemAction action;
     TransactionItemReason reason;
     std::string group_id;
+    // This nevra doesn't contain epoch if it is 0
     std::string nevra;
     std::filesystem::path package_path;
     std::string repo_id;
