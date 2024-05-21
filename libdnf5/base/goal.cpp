@@ -653,6 +653,7 @@ GoalProblem Goal::Impl::add_replay_to_goal(
     const transaction::TransactionReplay & replay,
     GoalJobSettings settings,
     std::filesystem::path replay_location) {
+    auto ret = GoalProblem::NO_PROBLEM;
     bool skip_unavailable = settings.resolve_skip_unavailable(base->get_config());
 
     std::unordered_set<std::string> rpm_nevra_cache;
@@ -661,6 +662,23 @@ GoalProblem Goal::Impl::add_replay_to_goal(
         rpm_nevra_cache.insert(package_replay.nevra);
         libdnf5::GoalJobSettings settings_per_package = settings;
         settings_per_package.set_clean_requirements_on_remove(libdnf5::GoalSetting::SET_FALSE);
+
+        std::optional<libdnf5::rpm::Package> local_pkg;
+        if (!package_replay.package_path.empty()) {
+            local_pkg =
+                base->get_repo_sack()->add_stored_transaction_package(replay_location / package_replay.package_path);
+        }
+
+        const auto nevras = rpm::Nevra::parse(package_replay.nevra, {rpm::Nevra::Form::NEVRA});
+        libdnf_assert(
+            nevras.size() > 0, "Cannot parse rpm nevra \"{}\" while replaying transaction.", package_replay.nevra);
+
+        rpm::PackageQuery query_na(base);
+        query_na.filter_name(nevras[0].get_name());
+        query_na.filter_arch(nevras[0].get_arch());
+        auto query_nevra = query_na;
+        query_nevra.filter_nevra(package_replay.nevra);
+
         if (!package_replay.repo_id.empty()) {
             repo::RepoQuery enabled_repos(base);
             enabled_repos.filter_enabled(true);
@@ -670,15 +688,71 @@ GoalProblem Goal::Impl::add_replay_to_goal(
             }
         }
 
-        std::optional<libdnf5::rpm::Package> local_pkg;
-
-        if (!package_replay.package_path.empty()) {
-            local_pkg =
-                base->get_repo_sack()->add_stored_transaction_package(replay_location / package_replay.package_path);
+        if (query_nevra.empty()) {
+            auto problem = transaction.p_impl->report_not_found(
+                GoalAction::REPLAY,
+                package_replay.nevra,
+                settings,
+                skip_unavailable ? libdnf5::Logger::Level::WARNING : libdnf5::Logger::Level::ERROR,
+                {transaction_item_action_to_string(package_replay.action)});
+            if (!skip_unavailable) {
+                ret |= problem;
+            }
+            continue;
         }
+
         if (package_replay.action == transaction::TransactionItemAction::UPGRADE ||
             package_replay.action == transaction::TransactionItemAction::INSTALL ||
             package_replay.action == transaction::TransactionItemAction::DOWNGRADE) {
+            // In order to properly report an error when another version of a package with action INSTALL is already
+            // installed we have to verify several conditions.
+            // - There is another versions installed for this package (name-arch).
+            // - The package isn't installonly.
+            // - The transaction doesn't contain an outbound action for this name-arch.
+            //   This could happend during transaction reverting because upgrade/downgrade/reinstall (and obsoleting) actions are reverted as a REMOVE.
+            //   For example upgrade transaction: [a-2 Upgrade, a-1 Replaced] is reverted to [a-2 Remove, a-1 Install].
+            //   This is because we don't store the "replaces" relationship in history DB (there is a table `item_replaced_by`, but it is not populated
+            //   and it doesn't seem worth it to populate it because of this use case) so we don't know which action to pick. We could try to guess
+            //   based on the transaction packages but check seems easier.
+            if (package_replay.action == transaction::TransactionItemAction::INSTALL) {
+                bool na_has_outbound_action = false;
+                query_na.filter_installed();
+                for (const auto & installed_na : query_na) {
+                    na_has_outbound_action |=
+                        std::find_if(replay.packages.begin(), replay.packages.end(), [&installed_na](const auto & r) {
+                            return r.nevra == installed_na.get_nevra() && transaction_item_action_is_outbound(r.action);
+                        }) != replay.packages.end();
+                    if (na_has_outbound_action) {
+                        break;
+                    }
+                }
+                if (!na_has_outbound_action) {
+                    auto is_installonly = query_na;
+                    is_installonly.filter_installonly();
+
+                    if (!query_na.empty() && is_installonly.empty()) {
+                        query_nevra.filter_installed();
+                        auto problem = query_nevra.empty() ? GoalProblem::INSTALLED_IN_DIFFERENT_VERSION
+                                                           : GoalProblem::ALREADY_INSTALLED;
+                        auto log_level = libdnf5::Logger::Level::WARNING;
+                        if (!settings.get_ignore_installed()) {
+                            log_level = libdnf5::Logger::Level::ERROR;
+                            ret = problem;
+                        }
+
+                        transaction.p_impl->add_resolve_log(
+                            GoalAction::REPLAY,
+                            problem,
+                            settings,
+                            libdnf5::transaction::TransactionItemType::PACKAGE,
+                            package_replay.nevra,
+                            {transaction_item_action_to_string(package_replay.action)},
+                            log_level);
+                        continue;
+                    }
+                }
+            }
+
             if (local_pkg) {
                 add_rpm_ids(GoalAction::INSTALL, *local_pkg, settings_per_package);
             } else {
@@ -693,6 +767,25 @@ GoalProblem Goal::Impl::add_replay_to_goal(
             }
             transaction.p_impl->rpm_reason_overrides[package_replay.nevra] = package_replay.reason;
         } else if (package_replay.action == transaction::TransactionItemAction::REMOVE) {
+            query_nevra.filter_installed();
+            if (query_nevra.empty()) {
+                auto log_level = libdnf5::Logger::Level::WARNING;
+                auto problem = GoalProblem::NOT_INSTALLED;
+                if (!settings.get_ignore_installed()) {
+                    log_level = libdnf5::Logger::Level::ERROR;
+                    ret |= problem;
+                }
+                transaction.p_impl->add_resolve_log(
+                    GoalAction::REPLAY,
+                    problem,
+                    settings,
+                    libdnf5::transaction::TransactionItemType::PACKAGE,
+                    package_replay.nevra,
+                    {transaction_item_action_to_string(package_replay.action)},
+                    log_level);
+                continue;
+            }
+
             if (local_pkg) {
                 add_rpm_ids(GoalAction::REMOVE, *local_pkg, settings_per_package);
             } else {
@@ -700,6 +793,24 @@ GoalProblem Goal::Impl::add_replay_to_goal(
             }
             transaction.p_impl->rpm_reason_overrides[package_replay.nevra] = package_replay.reason;
         } else if (package_replay.action == transaction::TransactionItemAction::REPLACED) {
+            query_nevra.filter_installed();
+            if (query_nevra.empty()) {
+                auto log_level = libdnf5::Logger::Level::WARNING;
+                auto problem = GoalProblem::NOT_INSTALLED;
+                if (!settings.get_ignore_installed()) {
+                    log_level = libdnf5::Logger::Level::ERROR;
+                    ret |= problem;
+                }
+                transaction.p_impl->add_resolve_log(
+                    GoalAction::REPLAY,
+                    problem,
+                    settings,
+                    libdnf5::transaction::TransactionItemType::PACKAGE,
+                    package_replay.nevra,
+                    {transaction_item_action_to_string(package_replay.action)},
+                    log_level);
+                continue;
+            }
             // Removing the original versions (the reverse part of an action like e.g. Upgrade) is more robust,
             // but we can't do it if skip_unavailable is set because if the inbound action is skipped we would
             // simply remove the package.
@@ -739,13 +850,47 @@ GoalProblem Goal::Impl::add_replay_to_goal(
             base->get_repo_sack()->add_stored_transaction_comps(replay_location / group_replay.group_path);
         }
 
+        comps::GroupQuery group_query_installed(base);
+        group_query_installed.filter_groupid(group_replay.group_id);
+        group_query_installed.filter_installed(true);
+
         if (group_replay.action == transaction::TransactionItemAction::INSTALL) {
             group_specs.emplace_back(
                 GoalAction::INSTALL, group_replay.reason, group_replay.group_id, settings_per_group);
         } else if (group_replay.action == transaction::TransactionItemAction::UPGRADE) {
+            if (group_query_installed.empty()) {
+                auto log_level = libdnf5::Logger::Level::WARNING;
+                if (!settings.get_ignore_installed()) {
+                    log_level = libdnf5::Logger::Level::ERROR;
+                    ret = GoalProblem::NOT_INSTALLED;
+                }
+                transaction.p_impl->add_resolve_log(
+                    GoalAction::REPLAY,
+                    GoalProblem::NOT_INSTALLED,
+                    settings,
+                    libdnf5::transaction::TransactionItemType::GROUP,
+                    group_replay.group_id,
+                    {transaction_item_action_to_string(group_replay.action)},
+                    log_level);
+            }
             group_specs.emplace_back(
                 GoalAction::UPGRADE, group_replay.reason, group_replay.group_id, settings_per_group);
         } else if (group_replay.action == transaction::TransactionItemAction::REMOVE) {
+            if (group_query_installed.empty()) {
+                auto log_level = libdnf5::Logger::Level::WARNING;
+                if (!settings.get_ignore_installed()) {
+                    log_level = libdnf5::Logger::Level::ERROR;
+                    ret = GoalProblem::NOT_INSTALLED;
+                }
+                transaction.p_impl->add_resolve_log(
+                    GoalAction::REPLAY,
+                    GoalProblem::NOT_INSTALLED,
+                    settings,
+                    libdnf5::transaction::TransactionItemType::GROUP,
+                    group_replay.group_id,
+                    {transaction_item_action_to_string(group_replay.action)},
+                    log_level);
+            }
             group_specs.emplace_back(
                 GoalAction::REMOVE, group_replay.reason, group_replay.group_id, settings_per_group);
         } else {
@@ -769,6 +914,10 @@ GoalProblem Goal::Impl::add_replay_to_goal(
             }
         }
 
+        comps::EnvironmentQuery env_query_installed(base);
+        env_query_installed.filter_environmentid(env_replay.environment_id);
+        env_query_installed.filter_installed(true);
+
         if (!env_replay.environment_path.empty()) {
             base->get_repo_sack()->add_stored_transaction_comps(replay_location / env_replay.environment_path);
         }
@@ -779,12 +928,42 @@ GoalProblem Goal::Impl::add_replay_to_goal(
                 env_replay.environment_id,
                 settings_per_environment);
         } else if (env_replay.action == transaction::TransactionItemAction::UPGRADE) {
+            if (env_query_installed.empty()) {
+                auto log_level = libdnf5::Logger::Level::WARNING;
+                if (!settings.get_ignore_installed()) {
+                    log_level = libdnf5::Logger::Level::ERROR;
+                    ret = GoalProblem::NOT_INSTALLED;
+                }
+                transaction.p_impl->add_resolve_log(
+                    GoalAction::REPLAY,
+                    GoalProblem::NOT_INSTALLED,
+                    settings,
+                    libdnf5::transaction::TransactionItemType::ENVIRONMENT,
+                    env_replay.environment_id,
+                    {transaction_item_action_to_string(env_replay.action)},
+                    log_level);
+            }
             group_specs.emplace_back(
                 GoalAction::UPGRADE,
                 transaction::TransactionItemReason::USER,
                 env_replay.environment_id,
                 settings_per_environment);
         } else if (env_replay.action == transaction::TransactionItemAction::REMOVE) {
+            if (env_query_installed.empty()) {
+                auto log_level = libdnf5::Logger::Level::WARNING;
+                if (!settings.get_ignore_installed()) {
+                    log_level = libdnf5::Logger::Level::ERROR;
+                    ret = GoalProblem::NOT_INSTALLED;
+                }
+                transaction.p_impl->add_resolve_log(
+                    GoalAction::REPLAY,
+                    GoalProblem::NOT_INSTALLED,
+                    settings,
+                    libdnf5::transaction::TransactionItemType::ENVIRONMENT,
+                    env_replay.environment_id,
+                    {transaction_item_action_to_string(env_replay.action)},
+                    log_level);
+            }
             group_specs.emplace_back(
                 GoalAction::REMOVE,
                 transaction::TransactionItemReason::USER,
@@ -796,7 +975,7 @@ GoalProblem Goal::Impl::add_replay_to_goal(
         }
     }
 
-    return GoalProblem::NO_PROBLEM;
+    return ret;
 }
 
 GoalProblem Goal::Impl::resolve_group_specs(std::vector<GroupSpec> & specs, base::Transaction & transaction) {
