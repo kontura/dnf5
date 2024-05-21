@@ -115,7 +115,10 @@ enum class GoalProblem : uint32_t {
     MODULE_SOLVER_ERROR_LATEST = (1 << 19),
     /// Error detected during resolvement of module dependencies
     MODULE_SOLVER_ERROR = (1 << 20),
-    MODULE_CANNOT_SWITH_STREAMS = (1 << 21)
+    MODULE_CANNOT_SWITH_STREAMS = (1 << 21),
+    /// Error when transaction contains additional unexpected elements.
+    /// Used when replaying transactions.
+    EXTRA = (1 << 22)
 };
 
 /// Types of Goal actions
@@ -137,7 +140,8 @@ enum class GoalAction {
     REASON_CHANGE,
     ENABLE,
     DISABLE,
-    RESET
+    RESET,
+    REPLAY
 };
 
 /// Convert GoalAction enum to user-readable string

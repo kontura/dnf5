@@ -379,6 +379,8 @@ std::string goal_action_to_string(GoalAction action) {
             return "Disable";
         case GoalAction::RESET:
             return "Reset";
+        case GoalAction::REPLAY:
+            return "Replay";
     }
     return "";
 }
