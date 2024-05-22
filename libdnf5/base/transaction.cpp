@@ -240,7 +240,8 @@ GoalProblem Transaction::Impl::report_not_found(
     GoalAction action,
     const std::string & pkg_spec,
     const GoalJobSettings & settings,
-    libdnf5::Logger::Level log_level) {
+    libdnf5::Logger::Level log_level,
+    std::set<std::string> additional_data) {
     auto sack = base->get_rpm_package_sack();
     rpm::PackageQuery query(base, rpm::PackageQuery::ExcludeFlags::IGNORE_EXCLUDES);
     if (action == GoalAction::REMOVE) {
@@ -255,7 +256,7 @@ GoalProblem Transaction::Impl::report_not_found(
             settings,
             libdnf5::transaction::TransactionItemType::PACKAGE,
             pkg_spec,
-            {},
+            additional_data,
             log_level);
         if (settings.get_report_hint()) {
             rpm::PackageQuery hints(base);
@@ -309,7 +310,7 @@ GoalProblem Transaction::Impl::report_not_found(
             settings,
             libdnf5::transaction::TransactionItemType::PACKAGE,
             pkg_spec,
-            {},
+            additional_data,
             log_level);
         return GoalProblem::ONLY_SRC;
     }
@@ -321,7 +322,7 @@ GoalProblem Transaction::Impl::report_not_found(
             settings,
             libdnf5::transaction::TransactionItemType::PACKAGE,
             pkg_spec,
-            {},
+            additional_data,
             log_level);
         return GoalProblem::EXCLUDED_VERSIONLOCK;
     } else {
@@ -332,7 +333,7 @@ GoalProblem Transaction::Impl::report_not_found(
             settings,
             libdnf5::transaction::TransactionItemType::PACKAGE,
             pkg_spec,
-            {},
+            additional_data,
             log_level);
         return GoalProblem::EXCLUDED;
     }

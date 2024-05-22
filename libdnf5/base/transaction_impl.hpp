@@ -62,7 +62,8 @@ public:
         GoalAction action,
         const std::string & pkg_spec,
         const GoalJobSettings & settings,
-        libdnf5::Logger::Level log_level);
+        libdnf5::Logger::Level log_level,
+        std::set<std::string> additional_data = {});
     void add_resolve_log(
         GoalAction action,
         GoalProblem problem,
