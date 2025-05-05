@@ -9,6 +9,12 @@ message("Building bindings for ruby")
 find_package(Ruby REQUIRED)
 include_directories(${Ruby_INCLUDE_DIRS})
 
+message("teeeeeeeeeeeeeeeeeeeeeeeeeeeeest")
+message("teeeeeeeeeeeeeeeeeeeeeeeeeeeeest")
+message("teeeeeeeeeeeeeeeeeeeeeeeeeeeeest")
+message("teeeeeeeeeeeeeeeeeeeeeeeeeeeeest")
+message("teeeeeeeeeeeeeeeeeeeeeeeeeeeeest")
+message("teeeeeeeeeeeeeeeeeeeeeeeeeeeeest")
 
 function(add_ruby_module LIBRARY_NAME MODULE_NAME)
     set(TARGET_NAME "ruby_${MODULE_NAME}")
