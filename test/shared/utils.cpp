@@ -57,10 +57,10 @@ std::vector<libdnf5::comps::Environment> to_vector(const libdnf5::Set<libdnf5::c
 }
 
 
-std::vector<libdnf5::comps::Group> to_vector(const libdnf5::Set<libdnf5::comps::Group> & group_set) {
+std::vector<libdnf5::comps::Group> to_vector(const libdnf5::Set<libdnf5::comps::GroupWeakPtr> & group_set) {
     std::vector<libdnf5::comps::Group> res;
     for (const auto & group : group_set) {
-        res.push_back(group);
+        res.push_back(*group);
     }
     return res;
 }

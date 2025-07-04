@@ -40,12 +40,13 @@
 %include "libdnf5/comps/group/package_type.hpp"
 %include "libdnf5/comps/group/package.hpp"
 %include "libdnf5/comps/group/group.hpp"
+%template(GroupWeakPtr) libdnf5::WeakPtr<libdnf5::comps::Group, false>;
 %template(VectorPackage) std::vector<libdnf5::comps::Package>;
-%template(SetConstIteratorGroup) libdnf5::SetConstIterator<libdnf5::comps::Group>;
-%template(SetGroup) libdnf5::Set<libdnf5::comps::Group>;
-%template(SackQueryGroup) libdnf5::sack::Query<libdnf5::comps::Group>;
+%template(SetConstIteratorGroupWeakPtr) libdnf5::SetConstIterator<libdnf5::comps::GroupWeakPtr>;
+%template(SetGroupWeakPtr) libdnf5::Set<libdnf5::comps::GroupWeakPtr>;
+%template(SackQueryGroupWeakPtr) libdnf5::sack::Query<libdnf5::comps::GroupWeakPtr>;
 %include "libdnf5/comps/group/query.hpp"
-add_iterator(SetGroup)
+add_iterator(SetGroupWeakPtr)
 
 %include "libdnf5/comps/environment/environment.hpp"
 %template(SetConstIteratorEnvironment) libdnf5::SetConstIterator<libdnf5::comps::Environment>;

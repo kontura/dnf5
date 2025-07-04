@@ -43,7 +43,7 @@ void CompsGroupQueryTest::setUp() {
 
 void CompsGroupQueryTest::test_query_all() {
     GroupQuery q_groups(base);
-    std::vector<Group> expected = {get_group("core"), get_group("critical-path-standard"), get_group("standard")};
+    std::vector<Group> expected = {get_group("critical-path-standard"), get_group("core"), get_group("standard")};
     CPPUNIT_ASSERT_EQUAL(expected, to_vector(q_groups));
 }
 
@@ -57,7 +57,9 @@ void CompsGroupQueryTest::test_query_filter_groupid() {
 
     // Filter groups with id containing "standard"
     q_groups = GroupQuery(base);
+    printf("size of full group query: %zu\n", q_groups.size());
     q_groups.filter_groupid("standard", libdnf5::sack::QueryCmp::CONTAINS);
+    printf("size of q_groups: %zu\n", q_groups.size());
     expected = {get_group("critical-path-standard"), get_group("standard")};
     CPPUNIT_ASSERT_EQUAL(expected, to_vector(q_groups));
 
@@ -112,7 +114,7 @@ void CompsGroupQueryTest::test_query_filter_uservisible() {
     // Filter groups with uservisible=true
     GroupQuery q_groups(base);
     q_groups.filter_uservisible(true);
-    std::vector<Group> expected = {get_group("core"), get_group("critical-path-standard")};
+    std::vector<Group> expected = {get_group("critical-path-standard"), get_group("core")};
     CPPUNIT_ASSERT_EQUAL(expected, to_vector(q_groups));
 
     // Filter groups with uservisible=false
@@ -160,7 +162,7 @@ void CompsGroupQueryTest::test_query_excludes() {
     q_excludes1.filter_groupid("standard");
     sack->set_user_group_excludes(q_excludes1);
     GroupQuery q_groups(base);
-    std::vector<Group> expected = {get_group("core"), get_group("critical-path-standard")};
+    std::vector<Group> expected = {get_group("critical-path-standard"), get_group("core")};
     CPPUNIT_ASSERT_EQUAL(expected, to_vector(q_groups));
 
     // Add group "core" to user excludes -> user excludes are groups: "standard", "core"
@@ -180,12 +182,12 @@ void CompsGroupQueryTest::test_query_excludes() {
     // Set user excludes to group "standard" -> user excludes are groups: "standard"
     sack->set_user_group_excludes(q_excludes1);
     q_groups = GroupQuery(base);
-    expected = {get_group("core"), get_group("critical-path-standard")};
+    expected = {get_group("critical-path-standard"), get_group("core")};
     CPPUNIT_ASSERT_EQUAL(expected, to_vector(q_groups));
 
     // Clear user excludes -> user excludes are empty
     sack->clear_user_group_excludes();
     q_groups = GroupQuery(base);
-    expected = {get_group("core"), get_group("critical-path-standard"), get_group("standard")};
+    expected = {get_group("critical-path-standard"), get_group("core"), get_group("standard")};
     CPPUNIT_ASSERT_EQUAL(expected, to_vector(q_groups));
 }

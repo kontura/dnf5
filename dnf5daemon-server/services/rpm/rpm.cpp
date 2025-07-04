@@ -858,7 +858,7 @@ sdbus::MethodReply Rpm::system_upgrade(sdbus::MethodCall & call) {
     libdnf5::comps::GroupQuery q_groups(*base);
     q_groups.filter_installed(true);
     for (const auto & grp : q_groups) {
-        goal.add_group_upgrade(grp.get_groupid());
+        goal.add_group_upgrade(grp->get_groupid());
     }
 
     libdnf5::comps::EnvironmentQuery q_environments(*base);

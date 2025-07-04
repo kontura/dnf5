@@ -1244,7 +1244,7 @@ GoalProblem Goal::Impl::resolve_group_specs(std::vector<GroupSpec> & specs, base
                         // We cannot simply compare the groups because they can have different libsolv ids,
                         // we have to compare them by groupid.
                         auto group_q_copy = group_q;
-                        group_q_copy.filter_groupid(group.get_groupid());
+                        group_q_copy.filter_groupid(group->get_groupid());
                         if (!group_q_copy.empty()) {
                             // If we have multiple different actions per group it always ends up as upgrade.
                             // This is because there are only 3 actions: INSTALL (together with INSTALL_BY_COMPS),
@@ -2516,13 +2516,13 @@ void Goal::Impl::add_group_install_to_goal(
     auto & cfg_main = base->get_config();
     auto allowed_package_types = settings.resolve_group_package_types(cfg_main);
     for (auto group : group_query) {
-        rpm_goal.add_group(group, transaction::TransactionItemAction::INSTALL, reason, allowed_package_types);
+        rpm_goal.add_group(*group, transaction::TransactionItemAction::INSTALL, reason, allowed_package_types);
         if (settings.get_group_no_packages()) {
             continue;
         }
         std::vector<libdnf5::comps::Package> packages;
         // TODO(mblaha): filter packages by p.arch attribute when supported by comps
-        for (const auto & p : group.get_packages()) {
+        for (const auto & p : group->get_packages()) {
             if (any(allowed_package_types & p.get_type())) {
                 packages.emplace_back(std::move(p));
             }
@@ -2544,7 +2544,7 @@ void Goal::Impl::add_group_remove_to_goal(
     std::set<std::string> removed_groups_ids;
     for (auto & [spec, reason, group_query, settings] : groups_to_remove) {
         for (const auto & group : group_query) {
-            removed_groups_ids.emplace(group.get_groupid());
+            removed_groups_ids.emplace(group->get_groupid());
         }
     }
     rpm::PackageQuery query_installed(base);
@@ -2554,13 +2554,13 @@ void Goal::Impl::add_group_remove_to_goal(
     rpm::PackageSet remove_candidates(base);
     for (auto & [spec, reason, group_query, settings] : groups_to_remove) {
         for (const auto & group : group_query) {
-            rpm_goal.add_group(group, transaction::TransactionItemAction::REMOVE, reason, {});
+            rpm_goal.add_group(*group, transaction::TransactionItemAction::REMOVE, reason, {});
             if (settings.get_group_no_packages()) {
                 continue;
             }
             // get all packages installed by the group
             rpm::PackageQuery group_packages(query_installed);
-            group_packages.filter_name(system_state.get_group_state(group.get_groupid()).packages);
+            group_packages.filter_name(system_state.get_group_state(group->get_groupid()).packages);
             // Remove packages installed by the group.
             // First collect packages that are not part of any other
             // installed group and are not user-installed.
@@ -2602,7 +2602,7 @@ void Goal::Impl::add_group_upgrade_to_goal(
     query_installed.filter_installed();
 
     for (auto installed_group : group_query) {
-        auto group_id = installed_group.get_groupid();
+        auto group_id = installed_group->get_groupid();
         // find available group of the same id
         comps::GroupQuery available_group_query(available_groups);
         available_group_query.filter_groupid(group_id);
@@ -2623,9 +2623,9 @@ void Goal::Impl::add_group_upgrade_to_goal(
 
         // upgrade the group itself
         rpm_goal.add_group(
-            available_group,
+            *available_group,
             transaction::TransactionItemAction::UPGRADE,
-            installed_group.get_reason(),
+            installed_group->get_reason(),
             state_group.package_types);
 
         if (settings.get_group_no_packages()) {
@@ -2635,17 +2635,17 @@ void Goal::Impl::add_group_upgrade_to_goal(
 
         // set of package names that are part of the installed version of the group
         std::set<std::string> old_set{};
-        for (const auto & pkg : installed_group.get_packages()) {
+        for (const auto & pkg : installed_group->get_packages()) {
             old_set.emplace(pkg.get_name());
         }
         // set of package names that are part of the available version of the group
         std::set<std::string> new_set{};
-        for (const auto & pkg : available_group.get_packages()) {
+        for (const auto & pkg : available_group->get_packages()) {
             new_set.emplace(pkg.get_name());
         }
 
         // install packages newly added to the group
-        for (const auto & pkg : available_group.get_packages_of_type(state_group.package_types)) {
+        for (const auto & pkg : available_group->get_packages_of_type(state_group.package_types)) {
             if (!old_set.contains(pkg.get_name())) {
                 install_group_package(transaction, pkg);
             }
@@ -2731,7 +2731,7 @@ void Goal::Impl::add_environment_remove_to_goal(
             // as dependencies and are not part of another installed environment.
             for (const auto & grp : environment_groups) {
                 // is the group part of another environment which is not being removed?
-                auto grp_environments = system_state.get_group_environments(grp.get_groupid());
+                auto grp_environments = system_state.get_group_environments(grp->get_groupid());
                 // remove from the list all environments being removed in this transaction
                 for (const auto & id : removed_environments_ids) {
                     grp_environments.erase(id);
@@ -2741,14 +2741,14 @@ void Goal::Impl::add_environment_remove_to_goal(
                 }
 
                 // was the group user-installed?
-                if (grp.get_reason() > transaction::TransactionItemReason::GROUP) {
+                if (grp->get_reason() > transaction::TransactionItemReason::GROUP) {
                     continue;
                 }
 
                 remove_group_specs.emplace_back(
                     GoalAction::REMOVE,
                     transaction::TransactionItemReason::DEPENDENCY,
-                    grp.get_groupid(),
+                    grp->get_groupid(),
                     group_settings);
             }
         }

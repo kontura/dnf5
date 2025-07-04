@@ -27,6 +27,32 @@ along with libdnf.  If not, see <https://www.gnu.org/licenses/>.
 
 namespace libdnf5::comps {
 
+class GroupSack;
+using GroupSackWeakPtr = WeakPtr<GroupSack, false>;
+
+class GroupSack : public sack::Sack<Group> {
+public:
+    //TODO(amatej): move definitios
+    void add_group(std::unique_ptr<Group> && item) {
+        add_item(std::move(item));
+    }
+
+    std::vector<std::unique_ptr<Group>> & get_data() {
+        return sack::Sack<Group>::get_data();
+    }
+
+    GroupSackWeakPtr get_weak_ptr() {
+        return {this, &sack_guard};
+    }
+
+    // Number of solvables in the comps pool when the
+    // sack was initialized.
+    int cached_solvables_size{0};
+private:
+    friend comps::GroupQuery;
+    WeakPtrGuard<GroupSack, false> sack_guard;
+
+};
 
 class CompsSack::Impl {
 public:
@@ -59,6 +85,10 @@ public:
     void set_user_group_excludes(const GroupQuery & excludes);
     void clear_user_group_excludes();
 
+    void init_group_sack();
+    //TODO(amatej): move this
+    GroupSackWeakPtr get_group_sack();
+
 private:
     friend comps::CompsSack;
 
@@ -69,6 +99,11 @@ private:
     std::set<std::string> config_group_excludes;        // groups explicitly excluded by config
     std::set<std::string> user_environment_excludes;    // environments explicitly excluded by API user
     std::set<std::string> user_group_excludes;          // groups explicitly excluded by API user
+
+    //TODO(amatej): check if we can move the excludes/includes into the group/env sack.
+    //              If not we don't need this to a be sack at all, we can just have:
+    //              std::vector<std::unique_ptr<T>> data;
+    GroupSack group_sack;
 };
 
 

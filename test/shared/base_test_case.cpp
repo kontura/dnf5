@@ -115,12 +115,12 @@ libdnf5::comps::Environment BaseTestCase::get_environment(const std::string & en
 
 libdnf5::comps::Group BaseTestCase::get_group(const std::string & groupid, bool installed) {
     // This is used for testing queries as well, hence we don't use the GroupQuery facility for filtering
-    libdnf5::Set<libdnf5::comps::Group> groups = libdnf5::comps::GroupQuery(base);
+    libdnf5::Set<libdnf5::comps::GroupWeakPtr> groups = libdnf5::comps::GroupQuery(base);
 
     std::set<libdnf5::comps::Group> found;
     for (auto group : groups) {
-        if (group.get_groupid() == groupid && group.get_installed() == installed) {
-            found.insert(group);
+        if (group->get_groupid() == groupid && group->get_installed() == installed) {
+            found.insert(*group);
         }
     }
 

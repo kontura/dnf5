@@ -153,12 +153,12 @@ struct assertion_traits<libdnf5::comps::Group> {
 };
 
 template <>
-struct assertion_traits<libdnf5::Set<libdnf5::comps::Group>> {
-    inline static std::string toString(const libdnf5::Set<libdnf5::comps::Group> & groups) {
+struct assertion_traits<libdnf5::Set<libdnf5::comps::GroupWeakPtr>> {
+    inline static std::string toString(const libdnf5::Set<libdnf5::comps::GroupWeakPtr> & groups) {
         std::string result;
 
         for (const auto & group : groups) {
-            result += "\n    " + assertion_traits<libdnf5::comps::Group>::toString(group);
+            result += "\n    " + assertion_traits<libdnf5::comps::Group>::toString(*group);
         }
 
         return result;
@@ -344,7 +344,7 @@ struct assertion_traits<libdnf5::transaction::EnvironmentReplay> {
 
 std::vector<libdnf5::advisory::Advisory> to_vector(const libdnf5::advisory::AdvisorySet & advisory_set);
 std::vector<libdnf5::comps::Environment> to_vector(const libdnf5::Set<libdnf5::comps::Environment> & environment_set);
-std::vector<libdnf5::comps::Group> to_vector(const libdnf5::Set<libdnf5::comps::Group> & group_set);
+std::vector<libdnf5::comps::Group> to_vector(const libdnf5::Set<libdnf5::comps::GroupWeakPtr> & group_set);
 std::vector<libdnf5::rpm::Reldep> to_vector(const libdnf5::rpm::ReldepList & reldep_list);
 std::vector<libdnf5::rpm::Package> to_vector(const libdnf5::rpm::PackageSet & package_set);
 

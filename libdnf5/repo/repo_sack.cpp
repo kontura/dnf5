@@ -946,7 +946,8 @@ void RepoSack::Impl::fix_group_missing_xml() {
                         // GroupQuery is basically a set thus iterators and `.get()` method
                         // return `const Group` objects.
                         // To call non-const serialize method we need to make a copy here.
-                        libdnf5::comps::Group group = group_query.get();
+                        // TODO(amatej): we might not need the copy here
+                        auto group = *group_query.get();
                         auto xml_file_name = comps_xml_dir / (group_id + ".xml");
                         logger.debug(
                             "Re-creating installed group \"{}\" definition to file \"{}\".",
