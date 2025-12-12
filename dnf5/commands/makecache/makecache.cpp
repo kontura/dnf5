@@ -57,7 +57,8 @@ void MakeCacheCommand::run() {
         return;
     }
 
-    ctx.load_repos(false, true);
+    // This needs to be refactored
+    //ctx.load_repos(false, true);
 
     std::cout << "Metadata cache created." << std::endl;
 }

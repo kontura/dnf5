@@ -53,6 +53,7 @@
 #include "commands/upgrade/upgrade.hpp"
 #include "commands/versionlock/versionlock.hpp"
 #include "dnf5/context.hpp"
+#include "context_impl.hpp"
 #include "download_callbacks.hpp"
 #include "plugins.hpp"
 #include "signal_handlers.hpp"
@@ -1547,7 +1548,7 @@ int main(int argc, char * argv[]) try {
             context.set_will_modify_system(will_modify_system);
 
             const auto load_available = context.get_load_available_repos() != dnf5::Context::LoadAvailableRepos::NONE;
-            context.load_repos(context.get_load_system_repo(), load_available);
+            context.p_impl->load_repos(context.get_load_system_repo(), load_available);
 
             command->load_additional_packages();
 

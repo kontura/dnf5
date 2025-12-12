@@ -496,10 +496,6 @@ void Context::update_repo_metadata_from_advisory_options(
         names, security, bugfix, enhancement, newpackage, severity, bzs, cves);
 }
 
-void Context::load_repos(bool load_system, bool load_available) {
-    p_impl->load_repos(load_system, load_available);
-}
-
 void Context::store_offline(libdnf5::base::Transaction & transaction) {
     p_impl->store_offline(transaction);
 }
@@ -1073,13 +1069,13 @@ std::vector<std::string> match_specs(
                 repo->get_config().get_skip_if_unavailable_option().set(libdnf5::Option::Priority::RUNTIME, true);
             }
 
-            ctx.load_repos(installed, true);
+            ctx.p_impl->load_repos(installed, true);
         } catch (...) {
             // Ignores errors when completing available packages, other completions may still work.
         }
     } else if (installed) {
         try {
-            ctx.load_repos(true, false);
+            ctx.p_impl->load_repos(true, false);
         } catch (...) {
             // Ignores errors when completing installed packages, other completions may still work.
         }

@@ -39,6 +39,9 @@
 #include <utility>
 #include <vector>
 
+// Forward declare main in global namescape so we can befriend it
+int main(int argc, char** argv);
+
 namespace dnf5 {
 
 constexpr const char * TRANSACTION_JSON = "transaction.json";
@@ -77,7 +80,8 @@ public:
         const std::vector<std::string> & cves);
 
     /// Sets callbacks for repositories and loads them, updating metadata if necessary.
-    void load_repos(bool load_system, bool load_available);
+    // We could deprecate or drop this
+    //void load_repos(bool load_system, bool load_available);
 
     void store_offline(libdnf5::base::Transaction & transaction);
 
@@ -184,6 +188,9 @@ public:
     bool get_show_version() const;
 
 private:
+    friend std::vector<std::string> match_specs(Context &, const std::string &, bool, bool, bool, bool, const char *);
+    friend int ::main(int, char**);
+
     class DNF_LOCAL Impl;
     std::unique_ptr<Impl> p_impl;
 };
